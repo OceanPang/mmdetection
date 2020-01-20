@@ -4,6 +4,7 @@ import torch.nn as nn
 
 from ..registry import LOSSES
 from .utils import weighted_loss
+from .smooth_l1_loss import smooth_l1_loss
 
 
 @weighted_loss
@@ -26,6 +27,16 @@ def balanced_l1_loss(pred,
     return loss
 
 
+def reweight(pred, target, alpha, gamma, beta):
+    diff = torch.abs(pred - target)
+    b = np.e**(gamma / alpha) - 1
+    base = torch.where(diff < beta, diff / beta, 1.0)
+    enhanced = torch.where(diff < beta, alpha * torch.log(b * diff / beta + 1),
+                           gamma)
+    rho = enhanced / base
+    return rho
+
+
 @LOSSES.register_module
 class BalancedL1Loss(nn.Module):
     """Balanced L1 Loss
@@ -38,6 +49,7 @@ class BalancedL1Loss(nn.Module):
                  gamma=1.5,
                  beta=1.0,
                  reduction='mean',
+                 use_reweight=False,
                  loss_weight=1.0):
         super(BalancedL1Loss, self).__init__()
         self.alpha = alpha
@@ -45,6 +57,7 @@ class BalancedL1Loss(nn.Module):
         self.beta = beta
         self.reduction = reduction
         self.loss_weight = loss_weight
+        self.use_reweight = use_reweight
 
     def forward(self,
                 pred,
@@ -56,14 +69,27 @@ class BalancedL1Loss(nn.Module):
         assert reduction_override in (None, 'none', 'mean', 'sum')
         reduction = (
             reduction_override if reduction_override else self.reduction)
-        loss_bbox = self.loss_weight * balanced_l1_loss(
-            pred,
-            target,
-            weight,
-            alpha=self.alpha,
-            gamma=self.gamma,
-            beta=self.beta,
-            reduction=reduction,
-            avg_factor=avg_factor,
-            **kwargs)
+
+        if self.use_reweight:
+            rho = reweight(pred, target, self.alpha, self.gamma,
+                           self.beta).detach()
+            loss_bbox = self.loss_weight * rho * smooth_l1_loss(
+                pred,
+                target,
+                weight,
+                beta=self.beta,
+                reduction=reduction,
+                avg_factor=avg_factor,
+                **kwargs)
+        else:
+            loss_bbox = self.loss_weight * balanced_l1_loss(
+                pred,
+                target,
+                weight,
+                beta=self.beta,
+                alpha=self.alpha,
+                gamma=self.gamma,
+                reduction=reduction,
+                avg_factor=avg_factor,
+                **kwargs)
         return loss_bbox
