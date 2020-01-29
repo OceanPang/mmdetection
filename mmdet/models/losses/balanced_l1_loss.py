@@ -50,7 +50,7 @@ class BalancedL1Loss(nn.Module):
                  gamma=1.5,
                  beta=1.0,
                  reduction='mean',
-                 use_reweight=False,
+                 use_lgr=False,
                  loss_weight=1.0):
         super(BalancedL1Loss, self).__init__()
         self.alpha = alpha
@@ -58,7 +58,7 @@ class BalancedL1Loss(nn.Module):
         self.beta = beta
         self.reduction = reduction
         self.loss_weight = loss_weight
-        self.use_reweight = use_reweight
+        self.use_lgr = use_lgr
 
     def forward(self,
                 pred,
@@ -71,7 +71,7 @@ class BalancedL1Loss(nn.Module):
         reduction = (
             reduction_override if reduction_override else self.reduction)
 
-        if self.use_reweight:
+        if self.use_lgr:
             rho = log_reweight(pred, target, self.alpha, self.gamma,
                                self.beta).detach()
             weight = rho * weight
