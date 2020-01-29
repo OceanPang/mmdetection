@@ -27,7 +27,7 @@ def balanced_l1_loss(pred,
     return loss
 
 
-def reweight(pred, target, alpha, gamma, beta):
+def log_reweight(pred, target, alpha, gamma, beta):
     diff = torch.abs(pred - target)
     ones = torch.ones_like(diff)
     b = np.e**(gamma / alpha) - 1
@@ -72,9 +72,10 @@ class BalancedL1Loss(nn.Module):
             reduction_override if reduction_override else self.reduction)
 
         if self.use_reweight:
-            rho = reweight(pred, target, self.alpha, self.gamma,
-                           self.beta).detach()
-            loss_bbox = self.loss_weight * rho * smooth_l1_loss(
+            rho = log_reweight(pred, target, self.alpha, self.gamma,
+                               self.beta).detach()
+            weight = rho * weight
+            loss_bbox = self.loss_weight * smooth_l1_loss(
                 pred,
                 target,
                 weight,
@@ -87,9 +88,9 @@ class BalancedL1Loss(nn.Module):
                 pred,
                 target,
                 weight,
-                beta=self.beta,
                 alpha=self.alpha,
                 gamma=self.gamma,
+                beta=self.beta,
                 reduction=reduction,
                 avg_factor=avg_factor,
                 **kwargs)
