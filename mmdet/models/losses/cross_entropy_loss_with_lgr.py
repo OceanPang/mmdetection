@@ -22,11 +22,11 @@ def cross_entropy(pred,
         weight = weight.float()
 
         p = F.softmax(pred, dim=1).detach()
-        n = p.shape[0]
-        idx = torch.zeros_like(p).to(torch.bool)
-        for i in range(n):
-            idx[i, label[i]] = True
-        p = 1 - p[idx]
+        inds = torch.arange(0,
+                            p.shape[0],
+                            dtype=torch.long,
+                            device=pred.device)
+        p = 1 - p[inds, label]
         b = np.e**(gamma / alpha) - 1
         enhanced = alpha * torch.log(b * p + 1)
         rho = enhanced / (p + 1e-6)
@@ -74,14 +74,28 @@ def binary_cross_entropy(pred,
     return loss
 
 
-def mask_cross_entropy(pred, target, label, reduction='mean', avg_factor=None):
+def mask_cross_entropy(pred,
+                       target,
+                       label,
+                       alpha=0.5,
+                       gamma=1.0,
+                       reduction='mean',
+                       avg_factor=None):
     # TODO: handle these two reserved arguments
     assert reduction == 'mean' and avg_factor is None
     num_rois = pred.size()[0]
     inds = torch.arange(0, num_rois, dtype=torch.long, device=pred.device)
     pred_slice = pred[inds, label].squeeze(1)
+
+    p = pred.softmax(dim=1).detach()[inds, label].squeeze(1)
+    base = target * (1 - p) + (1 - target) * p
+    b = np.e**(gamma / alpha) - 1
+    enhanced = alpha * torch.log(b * base + 1)
+    rho = enhanced / (base + 1e-6)
+
     return F.binary_cross_entropy_with_logits(pred_slice,
                                               target,
+                                              weight=rho,
                                               reduction='mean')[None]
 
 
