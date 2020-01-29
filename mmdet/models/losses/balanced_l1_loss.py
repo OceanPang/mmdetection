@@ -34,7 +34,7 @@ def log_reweight(pred, target, alpha, gamma, beta):
     base = torch.where(diff < beta, diff / beta, ones)
     enhanced = torch.where(diff < beta, alpha * torch.log(b * diff / beta + 1),
                            gamma * ones)
-    rho = enhanced / base
+    rho = enhanced / (base + 1e-6)
     return rho
 
 
