@@ -29,10 +29,11 @@ def balanced_l1_loss(pred,
 
 def reweight(pred, target, alpha, gamma, beta):
     diff = torch.abs(pred - target)
+    ones = torch.ones_like(diff)
     b = np.e**(gamma / alpha) - 1
-    base = torch.where(diff < beta, diff / beta, 1.0)
+    base = torch.where(diff < beta, diff / beta, ones)
     enhanced = torch.where(diff < beta, alpha * torch.log(b * diff / beta + 1),
-                           gamma)
+                           gamma * ones)
     rho = enhanced / base
     return rho
 
