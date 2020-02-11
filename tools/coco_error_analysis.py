@@ -4,6 +4,7 @@ from argparse import ArgumentParser
 from multiprocessing import Pool
 
 import matplotlib.pyplot as plt
+from matplotlib import rcParams
 import numpy as np
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
@@ -18,7 +19,7 @@ def makeplot(rs, ps, outDir, class_name, iou_type):
         np.array([.50, .39, .64]),
         np.array([1, .6, 0])
     ])
-    areaNames = ['allarea', 'small', 'medium', 'large']
+    areaNames = ['All', 'Small', 'Medium', 'Large']
     types = ['C75', 'C50', 'Loc', 'Sim', 'Oth', 'BG', 'FN']
     for i in range(len(areaNames)):
         area_ps = ps[..., i, 0]
@@ -29,23 +30,25 @@ def makeplot(rs, ps, outDir, class_name, iou_type):
         ]
         ps_curve.insert(0, np.zeros(ps_curve[0].shape))
         fig = plt.figure()
+        params = {'font.family': 'serif', 'font.serif': 'Times New Roman'}
+        rcParams.update(params)
         ax = plt.subplot(111)
         for k in range(len(types)):
             ax.plot(rs, ps_curve[k + 1], color=[0, 0, 0], linewidth=0.5)
-            ax.fill_between(
-                rs,
-                ps_curve[k],
-                ps_curve[k + 1],
-                color=cs[k],
-                label=str('[{:.3f}'.format(aps[k]) + ']' + types[k]))
-        plt.xlabel('recall')
-        plt.ylabel('precision')
+            ax.fill_between(rs,
+                            ps_curve[k],
+                            ps_curve[k + 1],
+                            color=cs[k],
+                            label=str('[{:.3f}'.format(aps[k]) + ']' +
+                                      types[k]))
+        plt.xlabel('Recall')
+        plt.ylabel('Precision')
         plt.xlim(0, 1.)
         plt.ylim(0, 1.)
-        plt.title(figure_tile)
+        plt.title('Libra R-CNN {}'.format(areaNames[i]))
         plt.legend()
         # plt.show()
-        fig.savefig(outDir + '/{}.png'.format(figure_tile))
+        fig.savefig(outDir + '/{}.png'.format(figure_tile), dpi=300)
         plt.close(fig)
 
 
@@ -121,8 +124,8 @@ def analyze_results(res_file, ann_file, res_types, out_dir):
                 '-------------create {}-----------------'.format(res_out_dir))
             os.makedirs(res_directory)
         iou_type = res_type
-        cocoEval = COCOeval(
-            copy.deepcopy(cocoGt), copy.deepcopy(cocoDt), iou_type)
+        cocoEval = COCOeval(copy.deepcopy(cocoGt), copy.deepcopy(cocoDt),
+                            iou_type)
         cocoEval.params.imgIds = imgIds
         cocoEval.params.iouThrs = [.75, .5, .1]
         cocoEval.params.maxDets = [100]
@@ -160,12 +163,14 @@ def main():
     parser = ArgumentParser(description='COCO Error Analysis Tool')
     parser.add_argument('result', help='result file (json format) path')
     parser.add_argument('out_dir', help='dir to save analyze result images')
-    parser.add_argument(
-        '--ann',
-        default='data/coco/annotations/instances_val2017.json',
-        help='annotation file path')
-    parser.add_argument(
-        '--types', type=str, nargs='+', default=['bbox'], help='result types')
+    parser.add_argument('--ann',
+                        default='data/coco/annotations/instances_val2017.json',
+                        help='annotation file path')
+    parser.add_argument('--types',
+                        type=str,
+                        nargs='+',
+                        default=['bbox'],
+                        help='result types')
     args = parser.parse_args()
     analyze_results(args.result, args.ann, args.types, out_dir=args.out_dir)
 
